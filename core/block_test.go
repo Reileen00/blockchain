@@ -1,64 +1,45 @@
 package core
 
 import (
-	"bytes"
-	"fmt"
 	"testing"
 	"time"
 
+	"github.com/Reileen00/blockchain/crypto"
 	"github.com/Reileen00/blockchain/types"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHeader_Encode_Decode(t *testing.T) {
-	h := &Header{
-		Version:   1,
-		PrevBlock: types.RandomHash(),
-		Timestamp: uint64(time.Now().UnixNano()),
-		Height:    10,
-		Nonce:     989394,
+func randomBlock(height uint32) *Block {
+	header := &Header{
+		Version:       1,
+		PrevBlockHash: types.RandomHash(),
+		Height:        int32(height),
+		Timestamp:     uint32(time.Now().UnixNano()),
 	}
+	tx := Transaction{
+		Data: []byte("foo"),
+	}
+	return NewBlock(header, []Transaction{tx})
+}
+func TestSignBlock(t *testing.T) {
+	privKey := crypto.GeneratePrivateKey()
+	b := randomBlock(0)
+	assert.Nil(t, b.Sign(privKey))
+	assert.NotNil(t, b.Signature)
 
-	buf := &bytes.Buffer{}
-	assert.Nil(t, h.EncodeBinary(buf))
-
-	hDecode := &Header{}
-	assert.Nil(t, hDecode.DecodeBinary(buf))
-	assert.Equal(t, h, hDecode)
 }
 
-func TestBlock_Encode_Decode(t *testing.T) {
-	b := &Block{
-		Header: Header{
-			Version:   1,
-			PrevBlock: types.RandomHash(),
-			Timestamp: uint64(time.Now().UnixNano()),
-			Height:    10,
-			Nonce:     989394,
-		},
-		Transactions: nil,
-	}
+func TestVerifyBlock(t *testing.T) {
+	privKey := crypto.GeneratePrivateKey()
+	b := randomBlock(0)
 
-	buf := &bytes.Buffer{}
-	assert.Nil(t, b.EncodeBinary(buf))
+	assert.Nil(t, b.Sign(privKey))
+	assert.Nil(t, b.Verify())
 
-	bDecode := &Block{}
-	assert.Nil(t, bDecode.DecodeBinary(buf))
-	assert.Equal(t, b, bDecode)
-	fmt.Printf("%+v", bDecode)
-}
+	otherPrivKey := crypto.GeneratePrivateKey()
+	b.Validator = otherPrivKey.PublicKey()
+	assert.NotNil(t, b.Verify())
 
-func TestBlockHash(t *testing.T) {
-	b := &Block{
-		Header: Header{
-			Version:   1,
-			PrevBlock: types.RandomHash(),
-			Timestamp: uint64(time.Now().UnixNano()),
-			Height:    10,
-		},
-		Transactions: []Transaction{},
-	}
-	h := b.Hash()
-	fmt.Println(h)
-	assert.False(t, h.IsZero())
+	b.Height = 100
+	assert.NotNil(t, b.Verify())
 }
